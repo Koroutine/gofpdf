@@ -1,6 +1,6 @@
-module github.com/phpdave11/gofpdf
+module github.com/koroutine/gofpdf
 
-go 1.12
+go 1.15
 
 require (
 	github.com/JoshVarga/svgparser v0.0.0-20200804023048-5eaba627a7d1
