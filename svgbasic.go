@@ -44,6 +44,13 @@ type SVGBasicSegmentType struct {
 	Arg [6]float64
 }
 
+// SVGElementType describes a generic XML element
+type SVGElementType struct {
+	Type       string
+	Value      string
+	Attributes map[string]interface{}
+}
+
 func absolutizePath(segs []SVGBasicSegmentType) {
 	var x, y float64
 	var segPtr *SVGBasicSegmentType
@@ -194,6 +201,7 @@ func pathParse(pathStr string) (segs []SVGBasicSegmentType, err error) {
 type SVGBasicType struct {
 	Wd, Ht   float64
 	Segments [][]SVGBasicSegmentType
+	Elements []SVGElementType
 }
 
 // SVGBasicParse parses a simple scalable vector graphics (SVG) buffer into a
@@ -207,10 +215,17 @@ func SVGBasicParse(buf []byte) (sig SVGBasicType, err error) {
 	type pathType struct {
 		D string `xml:"d,attr"`
 	}
+	type textType struct {
+		Value string  `xml:",chardata"`
+		X     float64 `xml:"x,attr"`
+		Y     float64 `xml:"y,attr"`
+		Fill  string  `xml:"fill,attr"`
+	}
 	type srcType struct {
 		Wd    float64    `xml:"width,attr"`
 		Ht    float64    `xml:"height,attr"`
 		Paths []pathType `xml:"path"`
+		Texts []textType `xml:"text"`
 	}
 	var src srcType
 	err = xml.Unmarshal(buf, &src)
@@ -226,6 +241,19 @@ func SVGBasicParse(buf []byte) (sig SVGBasicType, err error) {
 					}
 				}
 			}
+
+			for _, text := range src.Texts {
+				sig.Elements = append(sig.Elements, SVGElementType{
+					Type:  "text",
+					Value: text.Value,
+					Attributes: map[string]interface{}{
+						"x":    text.X,
+						"y":    text.Y,
+						"fill": text.Fill,
+					},
+				})
+			}
+
 		} else {
 			err = fmt.Errorf("unacceptable values for basic SVG extent: %.2f x %.2f",
 				sig.Wd, sig.Ht)

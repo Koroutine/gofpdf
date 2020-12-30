@@ -82,4 +82,20 @@ func (f *Fpdf) SVGBasicWrite(sb *SVGBasicType, scale float64) {
 			}
 		}
 	}
+
+	for _, el := range sb.Elements {
+		switch el.Type {
+		case "text":
+
+			f.Text(
+				el.Attributes["x"].(float64),
+				el.Attributes["y"].(float64),
+				el.Value,
+			)
+			break
+
+		default:
+			f.SetErrorf("Unexpected SVG element type '%s'", el.Type)
+		}
+	}
 }
