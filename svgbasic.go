@@ -17,11 +17,13 @@
 package gofpdf
 
 import (
-	"encoding/xml"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/JoshVarga/svgparser"
 )
 
 var pathCmdSub *strings.Replacer
@@ -199,9 +201,9 @@ func pathParse(pathStr string) (segs []SVGBasicSegmentType, err error) {
 // SVGBasicType aggregates the information needed to describe a multi-segment
 // basic vector image
 type SVGBasicType struct {
-	Wd, Ht   float64
+	Element  *svgparser.Element
 	Segments [][]SVGBasicSegmentType
-	Elements []SVGElementType
+	Wd, Ht   float64
 }
 
 // SVGBasicParse parses a simple scalable vector graphics (SVG) buffer into a
@@ -212,46 +214,35 @@ type SVGBasicType struct {
 // x1,y1), 'Q' (absolute quadratic Bézier curve: x0, y0, x1, y1) and 'Z'
 // (closepath).
 func SVGBasicParse(buf []byte) (sig SVGBasicType, err error) {
-	type pathType struct {
-		D string `xml:"d,attr"`
+
+	reader := bytes.NewReader(buf)
+	element, err := svgparser.Parse(reader, true)
+
+	wd, _ := strconv.ParseFloat(element.Attributes["width"], 64)
+	ht, _ := strconv.ParseFloat(element.Attributes["height"], 64)
+
+	src := SVGBasicType{
+		Element: element,
+		Wd:      wd,
+		Ht:      ht,
 	}
-	type textType struct {
-		Value string  `xml:",chardata"`
-		X     float64 `xml:"x,attr"`
-		Y     float64 `xml:"y,attr"`
-		Fill  string  `xml:"fill,attr"`
-	}
-	type srcType struct {
-		Wd    float64    `xml:"width,attr"`
-		Ht    float64    `xml:"height,attr"`
-		Paths []pathType `xml:"path"`
-		Texts []textType `xml:"text"`
-	}
-	var src srcType
-	err = xml.Unmarshal(buf, &src)
+
 	if err == nil {
 		if src.Wd > 0 && src.Ht > 0 {
 			sig.Wd, sig.Ht = src.Wd, src.Ht
+			sig.Element = src.Element
+
+			paths := src.Element.FindAll("path")
+
 			var segs []SVGBasicSegmentType
-			for _, path := range src.Paths {
+			for _, path := range paths {
+				d := path.Attributes["d"]
 				if err == nil {
-					segs, err = pathParse(path.D)
+					segs, err = pathParse(d)
 					if err == nil {
 						sig.Segments = append(sig.Segments, segs)
 					}
 				}
-			}
-
-			for _, text := range src.Texts {
-				sig.Elements = append(sig.Elements, SVGElementType{
-					Type:  "text",
-					Value: text.Value,
-					Attributes: map[string]interface{}{
-						"x":    text.X,
-						"y":    text.Y,
-						"fill": text.Fill,
-					},
-				})
 			}
 
 		} else {

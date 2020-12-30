@@ -16,6 +16,33 @@
 
 package gofpdf
 
+import (
+	"strconv"
+
+	"github.com/JoshVarga/svgparser"
+)
+
+func (f *Fpdf) drawElement(element *svgparser.Element) {
+
+	switch element.Name {
+	case "text":
+		x, _ := strconv.ParseFloat(element.Attributes["x"], 64)
+		y, _ := strconv.ParseFloat(element.Attributes["y"], 64)
+		f.Text(x, y, element.Content)
+		break
+	case "svg":
+	case "path":
+		// Handled by basic write
+		break
+	default:
+		f.SetErrorf("Unexpected SVG element type '%s'", element.Name)
+	}
+
+	for _, child := range element.Children {
+		f.drawElement(child)
+	}
+}
+
 // SVGBasicWrite renders the paths encoded in the basic SVG image specified by
 // sb. The scale value is used to convert the coordinates in the path to the
 // unit of measure specified in New(). The current position (as set with a call
@@ -83,19 +110,5 @@ func (f *Fpdf) SVGBasicWrite(sb *SVGBasicType, scale float64) {
 		}
 	}
 
-	for _, el := range sb.Elements {
-		switch el.Type {
-		case "text":
-
-			f.Text(
-				el.Attributes["x"].(float64),
-				el.Attributes["y"].(float64),
-				el.Value,
-			)
-			break
-
-		default:
-			f.SetErrorf("Unexpected SVG element type '%s'", el.Type)
-		}
-	}
+	f.drawElement(sb.Element)
 }
